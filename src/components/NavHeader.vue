@@ -9,11 +9,13 @@
           <a href="javascript:;">协议规则</a>
         </div>
         <div class="topbar-user">
-          <a href="javascript:;">登录</a>
-          <a href="javascript:;">注册</a>
-          <a href="javascript:;" class="my-cart">
+          <a href="javascript:;" v-if="username">{{ username }}</a>
+          <a href="javascript:;" v-if="username" @click="logout">退出</a>
+          <a href="javascript:;" v-if="!username" @click="goLogin">登录</a>
+          <a href="/#/order/list" v-if="username">订单</a>
+          <a href="javascript:;" class="my-cart" @click="goCart">
             <span class="icon-cart"></span>
-            购物车
+            购物车 ({{ cartCount }})
           </a>
         </div>
       </div>
@@ -28,16 +30,17 @@
             <span>小米手机</span>
             <div class="children">
               <ul>
-                <li class="product" v-for="item in 6" :key="item">
+                <li
+                  class="product"
+                  v-for="(phone, index) in phoneList"
+                  :key="index"
+                >
                   <a href="" target="_blank">
                     <div class="pro-img">
-                      <img
-                        src="https://cdn.cnbj0.fds.api.mi-img.com/b2c-mimall-media/f515ab05232ed14ccd78ec67e024495a.png"
-                        alt=""
-                      />
+                      <img :src="phone.mainImage" alt="" />
                     </div>
-                    <div class="pro-name">小米CC9</div>
-                    <div class="pro-price">1799元</div>
+                    <div class="pro-name">{{ phone.name }}</div>
+                    <div class="pro-price">{{ phone.price | currency }}</div>
                   </a>
                 </li>
               </ul>
@@ -109,10 +112,8 @@
           </div>
         </div>
         <div class="header-search">
-          <div class="wrapper">
-            <input type="text" name="keyword" />
-            <a href="javascript:;"></a>
-          </div>
+          <input type="text" name="keyword" />
+          <a href="javascript:;"></a>
         </div>
       </div>
     </div>
@@ -120,7 +121,63 @@
 </template>
 
 <script>
-  export default {}
+  import { mapState } from "vuex"
+  export default {
+    data() {
+      return {
+        phoneList: [],
+      }
+    },
+    computed: {
+      ...mapState(["username", "cartCount"]),
+    },
+    filters: {
+      currency(val) {
+        if (!val) return "0.00"
+        return "￥" + val.toFixed(2) + "元"
+      },
+    },
+    methods: {
+      getProductList() {
+        this.axios
+          .get("/products", {
+            params: {
+              categoryId: "100012",
+              pageSize: 6,
+            },
+          })
+          .then(res => {
+            console.log(res)
+            this.phoneList = res.list
+          })
+      },
+      goLogin() {
+        this.$router.push("/login")
+      },
+      logout() {
+        this.axios.post("/user/logout").then(res => {
+          this.$message.success("退出成功")
+          this.$cookie.set("userId", " ", { expires: "-1" }) //expires表示过期时间，这里是立即过期
+          this.$store.dispatch("SAVEUSERNAME", "")
+          this.$store.dispatch("SAVECARTCOUNT", "0")
+        })
+      },
+      getCartCount() {
+        this.axios.get("/carts/products/sum").then((res = 0) => {
+          this.$store.dispatch("SAVECARTCOUNT", res)
+        })
+      },
+      goCart() {
+        this.$router.push("/cart")
+      },
+    },
+    created() {
+      this.getProductList()
+      if (this.$route.params.from && this.$route.params.from === "login") {
+        this.getCartCount()
+      }
+    },
+  }
 </script>
 
 <style lang="scss">
@@ -140,12 +197,16 @@
           display: inline-block;
           color: #b0b0b0;
           margin-right: 17px;
+          &:hover {
+            color: #fff;
+          }
         }
         .my-cart {
           width: 110px;
           background-color: #ff6600;
           text-align: center;
           color: #fff;
+          margin-right: 0px;
           .icon-cart {
             @include bgImg(
               16px,
@@ -198,6 +259,7 @@
             font-size: 16px;
             line-height: 112px;
             margin-right: 20px;
+            cursor: pointer;
             span {
               cursor: pointer;
             }
@@ -219,6 +281,8 @@
               overflow: hidden;
               border-top: 1px solid #e5e5e5;
               box-shadow: 0px 7px 6px 0px rgba(0, 0, 0, 0.11);
+              background-color: #fff;
+              z-index: 999;
               .product {
                 float: left;
                 width: 16.6%;
@@ -266,26 +330,25 @@
         }
         .header-search {
           width: 319px;
-          .wrapper {
+          border: 2px solid #e0e0e0;
+          box-sizing: border-box;
+          &:focus-within {
+            border: 2px solid #ff6600;
+          }
+          input {
+            border: none;
+            box-sizing: border-box;
+            border-right: 2px solid #e0e0e0;
+            width: 264px;
             height: 50px;
-            border: 1px solid #e0e0e0;
-            display: flex;
-            align-items: center;
-            input {
-              border: none;
-              box-sizing: border-box;
-              border-right: 1px solid #e0e0e0;
-              width: 264px;
-              height: 50px;
-              padding-left: 14px;
-              &:focus {
-                border: 1px solid #ff6600;
-              }
+            padding-left: 14px;
+            &:focus {
+              border-right: 2px solid #ff6600;
             }
-            a {
-              @include bgImg(18px, 18px, "../../public/imgs/icon-search.png");
-              margin-left: 17px;
-            }
+          }
+          a {
+            @include bgImg(18px, 18px, "../../public/imgs/icon-search.png");
+            margin-left: 17px;
           }
         }
       }
